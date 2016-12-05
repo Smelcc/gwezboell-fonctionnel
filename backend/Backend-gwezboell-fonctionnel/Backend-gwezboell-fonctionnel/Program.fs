@@ -204,42 +204,56 @@ let rec ParcourirColonne = fun col -> fun y1 -> fun y2 -> fun x ->
     else if RecupererCase col x (y1 + 1) <> CaseVide then false
     else ParcourirColonne col x (y1 + 1) y2
 
+// TODO : Vérifier cases réservées au roi
+// TODO : Vérifier couleur du joueur et couleur de la pièce
+// TODO : Revoir règles du miam miam
 let EstCeBonCoup = fun partie -> fun x1 -> fun y1 -> fun x2 -> fun y2 ->
     match partie with
-    | Partie(Plateau(col), j1, j2, pg) -> if RecupererCase col x2 y2 = CasePiece(Roi) then false
+    | Partie(Plateau(col), j1, j2, pg) -> if RecupererCase col x2 y2 = CasePiece(Roi) then false // Revoir règles du miam miam
                                           else if y1 < y2 && x1 = x2 then ParcourirColonne col y1 y2 x1
                                           else if y1 > y2 && x1 = x2  then ParcourirColonne col y2 y1 x1
                                           else if x1 < x2 && y1 = y2 then ParcourirLigne col x1 x2 y1
                                           else if x1 > x2 && y1 = y2 then ParcourirLigne col x2 x1 y1
                                           else false
 
-// let RemplacerCase = fun x -> fun y -> fun case 
+let MettreAJourJoueur = fun j ->
+    match j with
+    | Joueur(coul, nick, tour) -> if tour = 1 then Joueur(coul, nick, 0) else Joueur(coul, nick, 1)
 
+let rec MettreAJourLigne = fun ligne -> fun y -> fun case ->
+    match ligne with
+    | Ligne(c,l) -> if y > 1 then Ligne(c, MettreAJourLigne l (y-1) case) else Ligne(case, l) //On remplace la case
 
-// let MettreAJour = fun partie -> fun x1 -> fun y1 -> fun x2 -> fun y2 -> 
-//    match partie with
-//    | Partie(Plateau(col), j1, j2, pg) -> if () <> (RemplacerCase x2 y2 (RecupererCase col x1 y1)) then RemplacerCase x1 y1 CaseVide
+let rec MettreAJourCol = fun col -> fun x -> fun y -> fun case ->
+    match col with
+    | Colonne(l, c) -> if x > 1 then Colonne(l, MettreAJourCol c (x-1) y case) else Colonne(MettreAJourLigne l y case, c)
 
-// let JouerCoup = fun partie -> fun x1 -> fun y1 -> fun x2 -> fun y2 ->
-   // if false = (EstCeBonneCaseDeDepart partie x1 y1) then "Erreur : Coup invalide (pièce de base incorrecte)"
-   // else if false = (EstCeBonCoup partie x1 y1 x2 y2) then "Erreur : Coup invalide (Mouvement interdit)"
-   // else PartieEnCours <- MettreAJour(partie x1 y1 x2 y2) // Penser à mettre tour à jour
-   //      ConvertirPartieEnTexte(PartieEnCours)
+let MettreAJourPlateau = fun plateau -> fun x1 -> fun y1 -> fun x2 -> fun y2 ->
+    match plateau with
+    | Plateau(col) -> Plateau(MettreAJourCol(MettreAJourCol col x2 y2 (RecupererCase col x1 y1)) x1 y1 CaseVide)
+
+let JouerCoup = fun partie -> fun x1 -> fun y1 -> fun x2 -> fun y2 ->
+    if false = (EstCeBonneCaseDeDepart partie x1 y1) then "Erreur : Coup invalide (pièce de base incorrecte)"
+    else if false = (EstCeBonCoup partie x1 y1 x2 y2) then "Erreur : Coup invalide (Mouvement interdit)"
+    else match partie with
+         | Partie(plateau, j1, j2, pg) -> PartieEnCours <- Partie((MettreAJourPlateau plateau x1 y1 x2 y2), MettreAJourJoueur j1, MettreAJourJoueur j2, pg)
+                                          //PartieEnCours <- MettreAJourVainqueur PartieEnCours
+                                          ConvertirPartieEnTexte(PartieEnCours)
+                                       
 
 let initialiserPartie = fun nick -> fun color ->
     if TexteVersCouleur color <> Incolore then ConvertirPartieEnTexte(GenererPartie nick 9 (TexteVersCouleur color))
     else "Erreur : Couleur invalide"
 
-//let jouerPartie = fun partie -> fun color -> fun x1 -> fun y1 -> fun x2 -> fun y2 ->
-    
-    //if TexteVersCouleur color = Incolore then "Erreur : Couleur invalide"
-    //else if false = EstCeUnBonIndex x1  then "Erreur : Valeur d'index incorrect (x1)"
-    //else if false = EstCeUnBonIndex y1  then "Erreur : Valeur d'index incorrect (y1)"
-    //else if false = EstCeUnBonIndex x2  then "Erreur : Valeur d'index incorrect (x2)"
-    //else if false = EstCeUnBonIndex y2  then "Erreur : Valeur d'index incorrect (y2)"
-    //else if false = EstCePartieEnCours partie then "Erreur : Partie non instanciée"
+let jouerPartie = fun partie -> fun color -> fun x1 -> fun y1 -> fun x2 -> fun y2 ->
+    if TexteVersCouleur color = Incolore then "Erreur : Couleur invalide"
+    else if false = EstCeUnBonIndex x1  then "Erreur : Valeur d'index incorrect (x1)"
+    else if false = EstCeUnBonIndex y1  then "Erreur : Valeur d'index incorrect (y1)"
+    else if false = EstCeUnBonIndex x2  then "Erreur : Valeur d'index incorrect (x2)"
+    else if false = EstCeUnBonIndex y2  then "Erreur : Valeur d'index incorrect (y2)"
+    else if false = EstCePartieEnCours partie then "Erreur : Partie non instanciée"
     //--- else if false = EstCeLeBonJoueur partie color then "Erreur : Ce n'est pas à ce joueur de jouer"
-    //else JouerCoup partie (StringToInt x1) (StringToInt y1) (StringToInt x2) (StringToInt y2)
+    else JouerCoup partie (StringToInt x1) (StringToInt y1) (StringToInt x2) (StringToInt y2)
     
 //Gestion du EndPoint
 [<ServiceContract>]
@@ -247,8 +261,8 @@ type MyContract() =
     [<OperationContract>]
     [<WebGet(UriTemplate="{nick}/{color}/")>]
     member this.GetPartie(nick:string, color:string) : Stream = upcast new MemoryStream(System.Text.Encoding.UTF8.GetBytes(initialiserPartie nick color))
-    //[<WebGet(UriTemplate="{nick}/{color}/{x1}:{y1}:{x2}:{y2}")>]
-    //member this.Get(nick:string, color:string, x1:string, y1: string, x2:string, y2:string) : Stream = upcast new MemoryStream(System.Text.Encoding.UTF8.GetBytes(jouerPartie PartieEnCours color x1 y1 x2 y2))
+    [<WebGet(UriTemplate="{nick}/{color}/{x1}:{y1}:{x2}:{y2}")>]
+    member this.Get(nick:string, color:string, x1:string, y1: string, x2:string, y2:string) : Stream = upcast new MemoryStream(System.Text.Encoding.UTF8.GetBytes(jouerPartie PartieEnCours color x1 y1 x2 y2))
 
 let Main() =
     let address = "http://localhost:64385/"
