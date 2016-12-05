@@ -1,0 +1,266 @@
+﻿open System
+open System.IO 
+open System.ServiceModel
+open System.ServiceModel.Web
+
+//Modèle de données
+type Couleur = 
+| Blanc
+| Noir 
+| Incolore
+
+type Joueur =
+| Joueur of Couleur * string * int // string --> nickname - int = à lui de jouer (1) sinon 0
+| Personne
+ 
+type PartieGagnee =
+| PartieGagnee of Joueur
+
+type Piece =
+| Roi // Roi nécessairement blanc
+| Tour of Couleur //couleur de la tour
+
+type Case = 
+| CasePiece of Piece
+| CaseVide
+
+type Ligne =
+| Ligne of Case * Ligne
+| LigneVide
+
+type Colonne = 
+| Colonne of Ligne * Colonne
+| ColonneVide
+
+type Plateau =
+| Plateau of Colonne
+
+type Partie =
+| Partie of Plateau * Joueur * Joueur  * PartieGagnee // Joueur = qui doit jouer (blanc ou noir)
+| Erreur of string
+| Vide
+
+let mutable PartieEnCours = Vide // équivalent variable
+
+//Parsers d'objets vers texte
+let ConvertirCouleurEnTexte = fun col ->
+    match col with
+    | Blanc -> "Blanc"
+    | Noir -> "Noir"
+    | Incolore -> "Incolore"
+
+let ConvertirJoueurEnTexte = fun j ->
+    match j with
+    | Joueur(coul, str, tour) -> if Blanc = coul then sprintf "Blanc:%s:%d" str tour else sprintf "Noir:%s:%d" str tour
+    | Personne -> "Personne"
+
+let ConvertirPieceEnTexte = fun p ->
+    match p with
+    | Roi -> "Roi:Blanc"
+    | Tour(j) -> sprintf "Tour:%s" (ConvertirCouleurEnTexte j)
+
+let ConvertirPartieGagneeEnTexte = fun pg ->
+    match pg with
+    | PartieGagnee(j) -> sprintf "PartieGagnee:%s" (ConvertirJoueurEnTexte j)
+
+let ConvertirCaseEnTexte = fun ca ->
+    match ca with
+    | CasePiece(p) -> sprintf "%s;" (ConvertirPieceEnTexte p)
+    | CaseVide -> "CaseVide;"
+
+let rec ConvertirLignesEnTexte = fun li ->
+    match li with
+    | Ligne(case, ligne) -> sprintf "%s%s" (ConvertirCaseEnTexte case) (ConvertirLignesEnTexte ligne)
+    | LigneVide -> ""
+
+let rec ConvertirColonnesEnTexte = fun col ->
+    match col with
+    | Colonne(l, c) -> sprintf "Ligne[%s]\n%s" (ConvertirLignesEnTexte l) (ConvertirColonnesEnTexte c)
+    | ColonneVide -> ""
+
+let ConvertirPlateauEnTexte = fun pl ->
+    match pl with
+    | Plateau(col) -> ConvertirColonnesEnTexte col
+
+let ConvertirPartieEnTexte = fun p ->
+    match p with
+    | Partie(pl, j1, j2, g) -> sprintf "%sJoueur1:%s;\nJoueur2:%s;\n%s;\n" (ConvertirPlateauEnTexte pl) 
+                                                                           (ConvertirJoueurEnTexte j1) 
+                                                                           (ConvertirJoueurEnTexte j2) 
+                                                                           (ConvertirPartieGagneeEnTexte g)
+    | Erreur(e) -> sprintf "%s" e
+
+//Match des entrées de l'API
+let TexteVersCouleur = fun color ->
+    if color = "Blanc" or color = "blanc" then Blanc
+    else if color = "Noir" or color = "noir" then Noir
+    else Incolore
+
+//Génération du plateau -- Voir pour utiliser des règles?
+let EstCeCaseRoi = fun x -> fun y ->
+    if x = 5 && y = 5 then true else false
+
+let EstCeTourBlanche = fun x -> fun y -> ((y >=3 && y <= 7 && y <> 5) && x = 5) || ((x >=3 && x <= 7 && x <> 5) && y = 5)
+
+let EstCeTourNoire = fun x -> fun y -> ((y>=4 && y <=6) && (x=1 || x=9)) || ((x>=4 && x <=6) && (y=1 || y=9)) || (x=2 && y=5)|| (y=2 && x=5) || (y=8 && x=5) || (x=8 && y=5)
+     
+let RecupererPiece = fun x -> fun y ->
+    if EstCeCaseRoi x y then CasePiece(Roi) 
+    else if EstCeTourBlanche x y then CasePiece(Tour(Blanc))
+    else if EstCeTourNoire x y then CasePiece(Tour(Noir))
+    else CaseVide
+
+let rec GenererLigne = fun x -> fun y ->
+    match y with
+    | y when y = 1 -> Ligne(RecupererPiece x y, LigneVide)
+    | y when y > 1 -> Ligne(RecupererPiece x y, GenererLigne x (y-1))
+     
+let rec GenererColonne = fun x -> fun y ->
+    match x with
+    | x when x = 1 -> Colonne(GenererLigne x y, ColonneVide)
+    | x when x > 1 -> Colonne(GenererLigne x y, GenererColonne (x-1) y)
+
+let GenererPlateau = fun x -> Plateau(GenererColonne x x)
+
+let RecupererCouleurCase = fun case ->
+    match case with
+    | CaseVide -> Incolore
+    | CasePiece(Tour(col)) -> col 
+    | CasePiece(r) -> Blanc
+
+let RecupererAutreCouleur = fun j ->
+    match j with
+    | Joueur(c, s, t) -> if c = Blanc then Noir else Blanc
+
+let RecupererAutreTour = fun j ->
+    match j with
+    | Joueur(c, s, t) -> if t = 0 then 1 else 0
+
+let AjouterSecondJoueur = fun p -> fun n ->
+    match p with
+    | Partie(pl, j1, j2, g) -> if j2 = Personne then PartieEnCours <- Partie(pl, j1, Joueur(RecupererAutreCouleur(j1), n, RecupererAutreTour(j1)), g) 
+                                                     PartieEnCours
+                                                else Erreur("La partie est déjà en cours")
+
+//TODO - Check si partie finie !!
+let GenererPartie = fun n -> fun x -> fun couleur ->
+    if PartieEnCours = Vide then
+        match x with
+        | x when x % 2 = 0 -> Erreur("Nombre de case invalide (le nombre doit être impair)")
+        | x when x % 2 = 1 -> 
+            if Noir = couleur then PartieEnCours <- Partie(GenererPlateau x, Joueur(couleur, n, 1), Personne, PartieGagnee(Personne)) 
+            else PartieEnCours <- Partie(GenererPlateau x, Joueur(couleur, n, 0), Personne, PartieGagnee(Personne)) 
+            PartieEnCours
+    else AjouterSecondJoueur PartieEnCours n 
+
+//Process de la partie
+let StringToInt = fun x ->
+    let mutable tmp = 0
+    if Int32.TryParse(x, &tmp) then tmp else -1
+
+let EstCeUnBonIndex = fun x -> StringToInt x > 0 && StringToInt x < 10
+
+let EstCePartieFinie = fun pg ->
+    match pg with
+    | PartieGagnee(j) -> j <> Personne 
+
+let EstCePartieEnCours = fun partie ->
+    match partie with
+    | Partie(p, j1, j2, pg) -> if j2 = Personne then false
+                                  else if EstCePartieFinie pg then false
+                                  else true 
+    | Vide -> false
+    | Erreur(s) -> false
+
+let AQuiDeJouer = fun j1 ->
+    match j1 with
+    | Joueur(col, nick, t) -> if 1 = t then col else RecupererAutreCouleur(j1)
+
+let rec RecupererCaseDeLaLigne = fun lig -> fun y ->
+    match lig with
+    | Ligne(case, ligne) -> if y > 1 then RecupererCaseDeLaLigne ligne (y-1) else case
+
+let rec RecupererLigneDeLaColonne = fun col -> fun x ->
+    match col with
+    | Colonne(l, c) -> if x > 1 then RecupererLigneDeLaColonne c (x-1) else l
+
+let RecupererCase = fun col -> fun x -> fun y -> RecupererCaseDeLaLigne (RecupererLigneDeLaColonne col x) y
+
+let RecupererCouleurPieceDeLaCase = fun plateau -> fun x -> fun y -> 
+    match plateau with
+    | Plateau(col) -> RecupererCouleurCase(RecupererCase col x y)
+
+let EstCeBonneCaseDeDepart = fun partie -> fun x -> fun y ->
+    match partie with
+    | Partie(pl, j1, j2, pg) -> (AQuiDeJouer j1) = (RecupererCouleurPieceDeLaCase pl x y)
+
+let rec ParcourirLigne = fun col -> fun x1 -> fun x2 -> fun y ->
+    if x1 + 1 = x2 then true
+    else if RecupererCase col (x1+1) y <> CaseVide then false
+    else ParcourirLigne col (x1+1) x2 y
+
+let rec ParcourirColonne = fun col -> fun y1 -> fun y2 -> fun x ->
+    if y1 + 1 = y2 then true
+    else if RecupererCase col x (y1 + 1) <> CaseVide then false
+    else ParcourirColonne col x (y1 + 1) y2
+
+let EstCeBonCoup = fun partie -> fun x1 -> fun y1 -> fun x2 -> fun y2 ->
+    match partie with
+    | Partie(Plateau(col), j1, j2, pg) -> if RecupererCase col x2 y2 = CasePiece(Roi) then false
+                                          else if y1 < y2 && x1 = x2 then ParcourirColonne col y1 y2 x1
+                                          else if y1 > y2 && x1 = x2  then ParcourirColonne col y2 y1 x1
+                                          else if x1 < x2 && y1 = y2 then ParcourirLigne col x1 x2 y1
+                                          else if x1 > x2 && y1 = y2 then ParcourirLigne col x2 x1 y1
+                                          else false
+
+// let RemplacerCase = fun x -> fun y -> fun case 
+
+
+// let MettreAJour = fun partie -> fun x1 -> fun y1 -> fun x2 -> fun y2 -> 
+//    match partie with
+//    | Partie(Plateau(col), j1, j2, pg) -> if () <> (RemplacerCase x2 y2 (RecupererCase col x1 y1)) then RemplacerCase x1 y1 CaseVide
+
+// let JouerCoup = fun partie -> fun x1 -> fun y1 -> fun x2 -> fun y2 ->
+   // if false = (EstCeBonneCaseDeDepart partie x1 y1) then "Erreur : Coup invalide (pièce de base incorrecte)"
+   // else if false = (EstCeBonCoup partie x1 y1 x2 y2) then "Erreur : Coup invalide (Mouvement interdit)"
+   // else PartieEnCours <- MettreAJour(partie x1 y1 x2 y2) // Penser à mettre tour à jour
+   //      ConvertirPartieEnTexte(PartieEnCours)
+
+let initialiserPartie = fun nick -> fun color ->
+    if TexteVersCouleur color <> Incolore then ConvertirPartieEnTexte(GenererPartie nick 9 (TexteVersCouleur color))
+    else "Erreur : Couleur invalide"
+
+//let jouerPartie = fun partie -> fun color -> fun x1 -> fun y1 -> fun x2 -> fun y2 ->
+    
+    //if TexteVersCouleur color = Incolore then "Erreur : Couleur invalide"
+    //else if false = EstCeUnBonIndex x1  then "Erreur : Valeur d'index incorrect (x1)"
+    //else if false = EstCeUnBonIndex y1  then "Erreur : Valeur d'index incorrect (y1)"
+    //else if false = EstCeUnBonIndex x2  then "Erreur : Valeur d'index incorrect (x2)"
+    //else if false = EstCeUnBonIndex y2  then "Erreur : Valeur d'index incorrect (y2)"
+    //else if false = EstCePartieEnCours partie then "Erreur : Partie non instanciée"
+    //--- else if false = EstCeLeBonJoueur partie color then "Erreur : Ce n'est pas à ce joueur de jouer"
+    //else JouerCoup partie (StringToInt x1) (StringToInt y1) (StringToInt x2) (StringToInt y2)
+    
+//Gestion du EndPoint
+[<ServiceContract>]
+type MyContract() =
+    [<OperationContract>]
+    [<WebGet(UriTemplate="{nick}/{color}/")>]
+    member this.GetPartie(nick:string, color:string) : Stream = upcast new MemoryStream(System.Text.Encoding.UTF8.GetBytes(initialiserPartie nick color))
+    //[<WebGet(UriTemplate="{nick}/{color}/{x1}:{y1}:{x2}:{y2}")>]
+    //member this.Get(nick:string, color:string, x1:string, y1: string, x2:string, y2:string) : Stream = upcast new MemoryStream(System.Text.Encoding.UTF8.GetBytes(jouerPartie PartieEnCours color x1 y1 x2 y2))
+
+let Main() =
+    let address = "http://localhost:64385/"
+    let host = new WebServiceHost(typeof<MyContract>, new Uri(address))
+    host.AddServiceEndpoint(typeof<MyContract>, new WebHttpBinding(), "") 
+        |> ignore
+    host.Open()
+
+
+    printfn "Server running at %s" address
+    printfn "Press a key to close server"
+    System.Console.ReadKey() |> ignore
+    host.Close()
+
+Main()
