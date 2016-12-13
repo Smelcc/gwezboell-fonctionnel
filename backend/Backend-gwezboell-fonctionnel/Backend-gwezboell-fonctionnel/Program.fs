@@ -45,46 +45,51 @@ let mutable PartieEnCours = Vide // équivalent variable
 //Parsers d'objets vers texte
 let ConvertirCouleurEnTexte = fun col ->
     match col with
-    | Blanc -> "Blanc"
-    | Noir -> "Noir"
+    | Blanc -> "B"
+    | Noir -> "N"
     | Incolore -> "Incolore"
 
 let ConvertirJoueurEnTexte = fun j ->
     match j with
-    | Joueur(coul, str, tour) -> if Blanc = coul then sprintf "Blanc:%s:%d" str tour else sprintf "Noir:%s:%d" str tour
-    | Personne -> "Personne"
+    | Joueur(coul, str, tour) -> if Blanc = coul then sprintf "{ \"Couleur\" : \"Blanc\", \"Pseudo\" : \"%s\",  \"Tour\" : %d }" str tour 
+                                                 else sprintf "{ \"Couleur\" : \"Noir\", \"Pseudo\" : \"%s\",  \"Tour\" : %d }" str tour 
+    | Personne -> "\"Personne\""
 
 let ConvertirPieceEnTexte = fun p ->
     match p with
-    | Roi -> "Roi:Blanc"
-    | Tour(j) -> sprintf "Tour:%s" (ConvertirCouleurEnTexte j)
+    | Roi -> "RoiB"
+    | Tour(j) -> sprintf "Pion%s" (ConvertirCouleurEnTexte j)
 
 let ConvertirPartieGagneeEnTexte = fun pg ->
     match pg with
-    | PartieGagnee(j) -> sprintf "PartieGagnee:%s" (ConvertirJoueurEnTexte j)
+    | PartieGagnee(j) -> sprintf "%s" (ConvertirJoueurEnTexte j)
 
 let ConvertirCaseEnTexte = fun ca ->
     match ca with
-    | CasePiece(p) -> sprintf "%s;" (ConvertirPieceEnTexte p)
-    | CaseVide -> "CaseVide;"
+    | CasePiece(p) -> sprintf "\\\"%s\\\"" (ConvertirPieceEnTexte p)
+    | CaseVide -> "\\\"Null\\\""
 
 let rec ConvertirLignesEnTexte = fun li ->
     match li with
-    | Ligne(case, ligne) -> sprintf "%s%s" (ConvertirCaseEnTexte case) (ConvertirLignesEnTexte ligne)
+    | Ligne(case, ligne) -> match ligne with 
+                            | Ligne(c, l) -> sprintf "%s,%s" (ConvertirCaseEnTexte case) (ConvertirLignesEnTexte ligne)
+                            | LigneVide -> sprintf "%s" (ConvertirCaseEnTexte case)
     | LigneVide -> ""
 
 let rec ConvertirColonnesEnTexte = fun col ->
     match col with
-    | Colonne(l, c) -> sprintf "Ligne[%s]\n%s" (ConvertirLignesEnTexte l) (ConvertirColonnesEnTexte c)
+    | Colonne(l, c) -> match c with 
+                       | Colonne(l1, c1) -> sprintf "[%s], %s" (ConvertirLignesEnTexte l) (ConvertirColonnesEnTexte c)
+                       | ColonneVide -> sprintf "[%s]" (ConvertirLignesEnTexte l)
     | ColonneVide -> ""
 
 let ConvertirPlateauEnTexte = fun pl ->
     match pl with
-    | Plateau(col) -> ConvertirColonnesEnTexte col
+    | Plateau(col) -> sprintf "[%s]" (ConvertirColonnesEnTexte col)
 
 let ConvertirPartieEnTexte = fun p ->
     match p with
-    | Partie(pl, j1, j2, g) -> sprintf "%sJoueur1:%s;\nJoueur2:%s;\n%s;\n" (ConvertirPlateauEnTexte pl) 
+    | Partie(pl, j1, j2, g) -> sprintf "{\"Plateau\" : \"%s\" , \"Joueur1\" : %s, \"Joueur2\" : %s, \"PartieGagnée\" : %s }" (ConvertirPlateauEnTexte pl) 
                                                                            (ConvertirJoueurEnTexte j1) 
                                                                            (ConvertirJoueurEnTexte j2) 
                                                                            (ConvertirPartieGagneeEnTexte g)
