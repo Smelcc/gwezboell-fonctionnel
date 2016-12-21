@@ -193,6 +193,10 @@ let RecupererCouleurPieceDeLaCase = fun plateau -> fun x -> fun y ->
     match plateau with
     | Plateau(col) -> RecupererCouleurCase(RecupererCase col x y)
 
+let RecupererJoueur = fun j1 -> fun j2 -> fun couleur ->
+    match j1 with
+    | Joueur(col, n, t) -> if col = couleur then j1 else j2
+
 let EstCeBonneCaseDeDepart = fun partie -> fun x -> fun y ->
     match partie with
     | Partie(pl, j1, j2, pg) -> (AQuiDeJouer j1) = (RecupererCouleurPieceDeLaCase pl x y)
@@ -207,7 +211,6 @@ let rec ParcourirColonne = fun col -> fun y1 -> fun y2 -> fun x ->
     else if RecupererCase col x y1 <> CaseVide then false
     else ParcourirColonne col (y1 + 1) y2 x
 
-// TODO : Vérifier cases réservées au roi
 let EstCeBonCoup = fun partie -> fun x1 -> fun y1 -> fun x2 -> fun y2 ->
     match partie with
     | Partie(Plateau(col), j1, j2, pg) -> if RecupererCase col x2 y2 <> CaseVide then false
@@ -267,12 +270,32 @@ let RetirerPieceHaut = fun plateau -> fun x -> fun y ->
 
 let RetirerPieces = fun plateau -> fun x -> fun y -> RetirerPieceHaut (RetirerPieceGauche (RetirerPieceDroite (RetirerPieceBas plateau x y) x y) x y) x y
 
+let EstCeRoiEncercle = fun col -> fun x -> fun y ->
+    if (x = 1 || RecupererCase col (x-1) y = CasePiece(Tour(Noir))) && 
+       (x = 9 || RecupererCase col (x+1) y = CasePiece(Tour(Noir))) && 
+       (y = 1 || RecupererCase col x (y-1) = CasePiece(Tour(Noir))) && 
+       (y = 9 || RecupererCase col x (y+1) = CasePiece(Tour(Noir))) then true
+    else false
+
+let EstCeNoirGagne = fun col -> fun x -> fun y -> if RecupererCouleurCase(RecupererCase col x y) = Blanc then false
+                                                  else if x > 1 && RecupererCase col (x-1) y = CasePiece(Roi) then EstCeRoiEncercle col (x-1) y
+                                                  else if y > 1 && RecupererCase col x (y-1) = CasePiece(Roi) then EstCeRoiEncercle col x (y-1)
+                                                  else if x < 9 && RecupererCase col (x+1) y = CasePiece(Roi) then EstCeRoiEncercle col (x+1) y
+                                                  else if y < 9 && RecupererCase col x (y+1) = CasePiece(Roi) then EstCeRoiEncercle col x (y+1)
+                                                  else false
+
+let MettreAJourVainqueur = fun partie -> fun x -> fun y ->
+    match partie with
+    | Partie(Plateau(col), j1, j2, pg) -> if RecupererCase col x y = CasePiece(Roi) && ((x = 1 && y = 1) || (x = 9 && y = 9) || (x = 1 && y = 9) || (x = 9 && y = 1)) then Partie(Plateau(col), j1, j2, PartieGagnee(RecupererJoueur j1 j2 Blanc))
+                                          else if EstCeNoirGagne col x y then Partie(Plateau(col), j1, j2, PartieGagnee(RecupererJoueur j1 j2 Noir))
+                                          else partie
+
 let JouerCoup = fun partie -> fun x1 -> fun y1 -> fun x2 -> fun y2 ->
     if false = (EstCeBonneCaseDeDepart partie x1 y1) then "Erreur : Coup invalide (pièce de base incorrecte)"
     else if false = (EstCeBonCoup partie x1 y1 x2 y2) then "Erreur : Coup invalide (Mouvement interdit)"
     else match partie with
-         | Partie(plateau, j1, j2, pg) -> PartieEnCours <- Partie(RetirerPieces (MettreAJourPlateau plateau x1 y1 x2 y2) x2 y2, MettreAJourJoueur j1, MettreAJourJoueur j2, pg)
-                                          //PartieEnCours <- MettreAJourVainqueur PartieEnCours
+         | Partie(plateau, j1, j2, pg) -> PartieEnCours <- MettreAJourVainqueur (Partie(RetirerPieces (MettreAJourPlateau plateau x1 y1 x2 y2) x2 y2, MettreAJourJoueur j1, MettreAJourJoueur j2, pg)) x2 y2
+                                          //PartieEnCours <-  PartieEnCours
                                           ConvertirPartieEnTexte(PartieEnCours)
                                        
 
