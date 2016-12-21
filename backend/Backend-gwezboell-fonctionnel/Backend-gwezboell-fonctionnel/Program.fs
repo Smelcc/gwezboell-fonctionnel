@@ -198,30 +198,34 @@ let EstCeBonneCaseDeDepart = fun partie -> fun x -> fun y ->
     | Partie(pl, j1, j2, pg) -> (AQuiDeJouer j1) = (RecupererCouleurPieceDeLaCase pl x y)
 
 let rec ParcourirLigne = fun col -> fun x1 -> fun x2 -> fun y ->
-    if x1 = x2 then true
+    if x1 > x2 then true
     else if RecupererCase col x1 y <> CaseVide then false
     else ParcourirLigne col (x1+1) x2 y
 
 let rec ParcourirColonne = fun col -> fun y1 -> fun y2 -> fun x ->
-    if y1 = y2 then true
+    if y1 > y2 then true
     else if RecupererCase col x y1 <> CaseVide then false
-    else ParcourirColonne col x (y1 + 1) y2
+    else ParcourirColonne col (y1 + 1) y2 x
 
 // TODO : Vérifier cases réservées au roi
-// TODO : Vérifier couleur du joueur et couleur de la pièce
-// TODO : Revoir règles du miam miam
 let EstCeBonCoup = fun partie -> fun x1 -> fun y1 -> fun x2 -> fun y2 ->
     match partie with
     | Partie(Plateau(col), j1, j2, pg) -> if RecupererCase col x2 y2 <> CaseVide then false
                                           else if y1 < y2 && x1 = x2 then ParcourirColonne col (y1+1) y2 x1
-                                          else if y1 > y2 && x1 = x2  then ParcourirColonne col (y2+1) y1 x1
+                                          else if y1 > y2 && x1 = x2  then ParcourirColonne col y2 (y1-1) x1
                                           else if x1 < x2 && y1 = y2 then ParcourirLigne col (x1+1) x2 y1
-                                          else if x1 > x2 && y1 = y2 then ParcourirLigne col (x2+1) x1 y1
+                                          else if x1 > x2 && y1 = y2 then ParcourirLigne col x2 (x1-1) y1
                                           else false
 
 let EstCeLeBonJoueur = fun partie -> fun color ->
     match partie with
     | Partie(c, j1, j2, pg) -> if AQuiDeJouer(j1) = TexteVersCouleur color then true else false
+
+let EstCePieceAManger = fun plateau -> fun x1 -> fun y1 -> fun x2 -> fun y2 -> fun x3 -> fun y3 ->
+    match plateau with
+    | Plateau(col) -> if RecupererCase col x2 y2 = CasePiece(Roi) then false
+                      else if x3 = 0 || y3 = 0 || x3 = 10 || y3 = 10 then RecupererCouleurPieceDeLaCase plateau x1 y1 <> RecupererCouleurPieceDeLaCase plateau x2 y2
+                      else (RecupererCouleurPieceDeLaCase plateau x1 y1 <> RecupererCouleurPieceDeLaCase plateau x2 y2) && (RecupererCouleurPieceDeLaCase plateau x1 y1 = RecupererCouleurPieceDeLaCase plateau x3 y3)
 
 let MettreAJourJoueur = fun j ->
     match j with
@@ -239,11 +243,33 @@ let MettreAJourPlateau = fun plateau -> fun x1 -> fun y1 -> fun x2 -> fun y2 ->
     match plateau with
     | Plateau(col) -> Plateau(MettreAJourCol(MettreAJourCol col x2 y2 (RecupererCase col x1 y1)) x1 y1 CaseVide)
 
+let RetirerPieceBas = fun plateau -> fun x -> fun y ->
+    if x = 9 then plateau 
+    else match plateau with
+         | Plateau(col) -> if EstCePieceAManger plateau x y (x+1) y (x+2) y then Plateau(MettreAJourCol col (x+1) y CaseVide) else plateau
+
+let RetirerPieceDroite = fun plateau -> fun x -> fun y ->
+    if y = 9 then plateau 
+    else match plateau with
+         | Plateau(col) -> if EstCePieceAManger plateau x y x (y+1) x (y+2) then Plateau(MettreAJourCol col x (y+1) CaseVide) else plateau
+
+let RetirerPieceGauche = fun plateau -> fun x -> fun y ->
+    if y = 1 then plateau 
+    else match plateau with
+         | Plateau(col) -> if EstCePieceAManger plateau x y x (y-1) x (y-2) then Plateau(MettreAJourCol col x (y-1) CaseVide) else plateau
+
+let RetirerPieceHaut = fun plateau -> fun x -> fun y ->
+    if x = 1 then plateau 
+    else match plateau with
+         | Plateau(col) -> if EstCePieceAManger plateau x y (x-1) y (x-2) y then Plateau(MettreAJourCol col (x-1) y CaseVide) else plateau
+
+let RetirerPieces = fun plateau -> fun x -> fun y -> RetirerPieceHaut (RetirerPieceGauche (RetirerPieceDroite (RetirerPieceBas plateau x y) x y) x y) x y
+
 let JouerCoup = fun partie -> fun x1 -> fun y1 -> fun x2 -> fun y2 ->
     if false = (EstCeBonneCaseDeDepart partie x1 y1) then "Erreur : Coup invalide (pièce de base incorrecte)"
     else if false = (EstCeBonCoup partie x1 y1 x2 y2) then "Erreur : Coup invalide (Mouvement interdit)"
     else match partie with
-         | Partie(plateau, j1, j2, pg) -> PartieEnCours <- Partie((MettreAJourPlateau plateau x1 y1 x2 y2), MettreAJourJoueur j1, MettreAJourJoueur j2, pg)
+         | Partie(plateau, j1, j2, pg) -> PartieEnCours <- Partie(RetirerPieces (MettreAJourPlateau plateau x1 y1 x2 y2) x2 y2, MettreAJourJoueur j1, MettreAJourJoueur j2, pg)
                                           //PartieEnCours <- MettreAJourVainqueur PartieEnCours
                                           ConvertirPartieEnTexte(PartieEnCours)
                                        
