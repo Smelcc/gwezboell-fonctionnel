@@ -145,7 +145,7 @@ let AjouterSecondJoueur = fun p -> fun n ->
     match p with
     | Partie(pl, j1, j2, g) -> if j2 = Personne then PartieEnCours <- Partie(pl, j1, Joueur(RecupererAutreCouleur(j1), n, RecupererAutreTour(j1)), g) 
                                                      PartieEnCours
-                                                else Erreur("La partie est déjà en cours")
+                                                else PartieEnCours
 
 //TODO - Check si partie finie !!
 let GenererPartie = fun n -> fun x -> fun couleur ->
