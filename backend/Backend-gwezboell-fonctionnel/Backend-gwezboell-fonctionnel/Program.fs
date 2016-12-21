@@ -211,6 +211,8 @@ let rec ParcourirColonne = fun col -> fun y1 -> fun y2 -> fun x ->
 let EstCeBonCoup = fun partie -> fun x1 -> fun y1 -> fun x2 -> fun y2 ->
     match partie with
     | Partie(Plateau(col), j1, j2, pg) -> if RecupererCase col x2 y2 <> CaseVide then false
+                                          else if RecupererCase col x1 y1 <> CasePiece(Roi) && 
+                                            ((x2=5 && y2=5) || (x2=1 && y2=1) || (x2=9 && y2=9) || (x2=1 && y2=9) || (x2=9 && y2=1)) then false //Check des cases réservées au roi
                                           else if y1 < y2 && x1 = x2 then ParcourirColonne col (y1+1) y2 x1
                                           else if y1 > y2 && x1 = x2  then ParcourirColonne col y2 (y1-1) x1
                                           else if x1 < x2 && y1 = y2 then ParcourirLigne col (x1+1) x2 y1
