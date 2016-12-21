@@ -133,19 +133,17 @@ let RecupererCouleurCase = fun case ->
     | CasePiece(Tour(col)) -> col 
     | CasePiece(r) -> Blanc
 
-let RecupererAutreCouleur = fun j ->
-    match j with
-    | Joueur(c, s, t) -> if c = Blanc then Noir else Blanc
+let RecupererAutreCouleur = fun col ->
+    if col = Blanc then Noir else Blanc
 
-let RecupererAutreTour = fun j ->
-    match j with
-    | Joueur(c, s, t) -> if t = 0 then 1 else 0
+let RecupererAutreTour = fun t ->
+    if t = 0 then 1 else 0
 
 let AjouterSecondJoueur = fun p -> fun n ->
     match p with
-    | Partie(pl, j1, j2, g) -> if j2 = Personne then PartieEnCours <- Partie(pl, j1, Joueur(RecupererAutreCouleur(j1), n, RecupererAutreTour(j1)), g) 
-                                                     PartieEnCours
-                                                else Erreur("La partie est déjà en cours")
+    | Partie(pl, Joueur(col,n1,t1), j2, g) -> if j2 = Personne then PartieEnCours <- Partie(pl, Joueur(col,n1,t1), Joueur(RecupererAutreCouleur(col), n, RecupererAutreTour(t1)), g) 
+                                                                    PartieEnCours
+                                                               else PartieEnCours
 
 //TODO - Check si partie finie !!
 let GenererPartie = fun n -> fun x -> fun couleur ->
@@ -179,7 +177,7 @@ let EstCePartieEnCours = fun partie ->
 
 let AQuiDeJouer = fun j1 ->
     match j1 with
-    | Joueur(col, nick, t) -> if 1 = t then col else RecupererAutreCouleur(j1)
+    | Joueur(col, nick, t) -> if 1 = t then col else RecupererAutreCouleur(col)
 
 let rec RecupererCaseDeLaLigne = fun lig -> fun y ->
     match lig with
@@ -200,13 +198,13 @@ let EstCeBonneCaseDeDepart = fun partie -> fun x -> fun y ->
     | Partie(pl, j1, j2, pg) -> (AQuiDeJouer j1) = (RecupererCouleurPieceDeLaCase pl x y)
 
 let rec ParcourirLigne = fun col -> fun x1 -> fun x2 -> fun y ->
-    if x1 + 1 = x2 then true
-    else if RecupererCase col (x1+1) y <> CaseVide then false
+    if x1 = x2 then true
+    else if RecupererCase col x1 y <> CaseVide then false
     else ParcourirLigne col (x1+1) x2 y
 
 let rec ParcourirColonne = fun col -> fun y1 -> fun y2 -> fun x ->
-    if y1 + 1 = y2 then true
-    else if RecupererCase col x (y1 + 1) <> CaseVide then false
+    if y1 = y2 then true
+    else if RecupererCase col x y1 <> CaseVide then false
     else ParcourirColonne col x (y1 + 1) y2
 
 // TODO : Vérifier cases réservées au roi
@@ -214,12 +212,16 @@ let rec ParcourirColonne = fun col -> fun y1 -> fun y2 -> fun x ->
 // TODO : Revoir règles du miam miam
 let EstCeBonCoup = fun partie -> fun x1 -> fun y1 -> fun x2 -> fun y2 ->
     match partie with
-    | Partie(Plateau(col), j1, j2, pg) -> if RecupererCase col x2 y2 = CasePiece(Roi) then false // Revoir règles du miam miam
-                                          else if y1 < y2 && x1 = x2 then ParcourirColonne col y1 y2 x1
-                                          else if y1 > y2 && x1 = x2  then ParcourirColonne col y2 y1 x1
-                                          else if x1 < x2 && y1 = y2 then ParcourirLigne col x1 x2 y1
-                                          else if x1 > x2 && y1 = y2 then ParcourirLigne col x2 x1 y1
+    | Partie(Plateau(col), j1, j2, pg) -> if RecupererCase col x2 y2 <> CaseVide then false
+                                          else if y1 < y2 && x1 = x2 then ParcourirColonne col (y1+1) y2 x1
+                                          else if y1 > y2 && x1 = x2  then ParcourirColonne col (y2+1) y1 x1
+                                          else if x1 < x2 && y1 = y2 then ParcourirLigne col (x1+1) x2 y1
+                                          else if x1 > x2 && y1 = y2 then ParcourirLigne col (x2+1) x1 y1
                                           else false
+
+let EstCeLeBonJoueur = fun partie -> fun color ->
+    match partie with
+    | Partie(c, j1, j2, pg) -> if AQuiDeJouer(j1) = TexteVersCouleur color then true else false
 
 let MettreAJourJoueur = fun j ->
     match j with
@@ -257,7 +259,7 @@ let jouerPartie = fun partie -> fun color -> fun x1 -> fun y1 -> fun x2 -> fun y
     else if false = EstCeUnBonIndex x2  then "Erreur : Valeur d'index incorrect (x2)"
     else if false = EstCeUnBonIndex y2  then "Erreur : Valeur d'index incorrect (y2)"
     else if false = EstCePartieEnCours partie then "Erreur : Partie non instanciée"
-    //--- else if false = EstCeLeBonJoueur partie color then "Erreur : Ce n'est pas à ce joueur de jouer"
+    else if false = EstCeLeBonJoueur partie color then "Erreur : Ce n'est pas à ce joueur de jouer"
     else JouerCoup partie (StringToInt x1) (StringToInt y1) (StringToInt x2) (StringToInt y2)
     
 //Gestion du EndPoint
