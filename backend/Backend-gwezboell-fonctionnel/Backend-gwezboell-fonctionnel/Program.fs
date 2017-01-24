@@ -53,7 +53,7 @@ let ConvertirJoueurEnTexte = fun j ->
     match j with
     | Joueur(coul, str, tour) -> if Blanc = coul then sprintf "{ \"Couleur\" : \"Blanc\", \"Pseudo\" : \"%s\",  \"Tour\" : %d }" str tour 
                                                  else sprintf "{ \"Couleur\" : \"Noir\", \"Pseudo\" : \"%s\",  \"Tour\" : %d }" str tour 
-    | Personne -> "\"Personne\""
+    | Personne -> "{ \"Couleur\" : \"Null\", \"Pseudo\" : \"Null\",  \"Tour\" : 0 }"
 
 let ConvertirPieceEnTexte = fun p ->
     match p with
@@ -66,8 +66,8 @@ let ConvertirPartieGagneeEnTexte = fun pg ->
 
 let ConvertirCaseEnTexte = fun ca ->
     match ca with
-    | CasePiece(p) -> sprintf "\\\"%s\\\"" (ConvertirPieceEnTexte p)
-    | CaseVide -> "\\\"Null\\\""
+    | CasePiece(p) -> sprintf "\"%s\"" (ConvertirPieceEnTexte p)
+    | CaseVide -> "\"Null\""
 
 let rec ConvertirLignesEnTexte = fun li ->
     match li with
@@ -89,7 +89,7 @@ let ConvertirPlateauEnTexte = fun pl ->
 
 let ConvertirPartieEnTexte = fun p ->
     match p with
-    | Partie(pl, j1, j2, g) -> sprintf "{\"Plateau\" : \"%s\" , \"Joueur1\" : %s, \"Joueur2\" : %s, \"PartieGagnée\" : %s }" (ConvertirPlateauEnTexte pl) 
+    | Partie(pl, j1, j2, g) -> sprintf "{\"Plateau\" : %s , \"Joueur1\" : %s, \"Joueur2\" : %s, \"PartieGagnee\" : %s }" (ConvertirPlateauEnTexte pl) 
                                                                            (ConvertirJoueurEnTexte j1) 
                                                                            (ConvertirJoueurEnTexte j2) 
                                                                            (ConvertirPartieGagneeEnTexte g)
@@ -291,7 +291,7 @@ let MettreAJourVainqueur = fun partie -> fun x -> fun y ->
                                           else partie
 
 let JouerCoup = fun partie -> fun x1 -> fun y1 -> fun x2 -> fun y2 ->
-    if false = (EstCeBonneCaseDeDepart partie x1 y1) then "Erreur : Coup invalide (pièce de base incorrecte)"
+    if false = (EstCeBonneCaseDeDepart partie x1 y1) then "Erreur : Coup invalide (piè[ce de base incorrecte)"
     else if false = (EstCeBonCoup partie x1 y1 x2 y2) then "Erreur : Coup invalide (Mouvement interdit)"
     else match partie with
          | Partie(plateau, j1, j2, pg) -> PartieEnCours <- MettreAJourVainqueur (Partie(RetirerPieces (MettreAJourPlateau plateau x1 y1 x2 y2) x2 y2, MettreAJourJoueur j1, MettreAJourJoueur j2, pg)) x2 y2
