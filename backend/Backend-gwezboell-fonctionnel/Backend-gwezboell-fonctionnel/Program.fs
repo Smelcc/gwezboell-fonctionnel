@@ -314,25 +314,42 @@ let jouerPartie = fun partie -> fun color -> fun x1 -> fun y1 -> fun x2 -> fun y
     else JouerCoup partie (StringToInt x1) (StringToInt y1) (StringToInt x2) (StringToInt y2)
     
 //Gestion du EndPoint
-[<ServiceContract>]
-type MyContract() =
-    [<OperationContract>]
-    [<WebGet(UriTemplate="{nick}/{color}/")>]
-    member this.GetPartie(nick:string, color:string) : Stream = upcast new MemoryStream(System.Text.Encoding.UTF8.GetBytes(initialiserPartie nick color))
-    [<WebGet(UriTemplate="{nick}/{color}/{x1}:{y1}:{x2}:{y2}")>]
-    member this.Get(nick:string, color:string, x1:string, y1: string, x2:string, y2:string) : Stream = upcast new MemoryStream(System.Text.Encoding.UTF8.GetBytes(jouerPartie PartieEnCours color x1 y1 x2 y2))
+// [<ServiceContract>]
+// type MyContract() =
+    // [<OperationContract>]
+    // [<WebGet(UriTemplate="{nick}/{color}/")>]
+    // member this.GetPartie(nick:string, color:string) : Stream = upcast new MemoryStream(System.Text.Encoding.UTF8.GetBytes(initialiserPartie nick color))
+    // [<WebGet(UriTemplate="{nick}/{color}/{x1}:{y1}:{x2}:{y2}")>]
+    // member this.Get(nick:string, color:string, x1:string, y1: string, x2:string, y2:string) : Stream = upcast new MemoryStream(System.Text.Encoding.UTF8.GetBytes(jouerPartie PartieEnCours color x1 y1 x2 y2))
 
-let Main() =
-    let address = "http://localhost:64385/"
-    let host = new WebServiceHost(typeof<MyContract>, new Uri(address))
-    host.AddServiceEndpoint(typeof<MyContract>, new WebHttpBinding(), "") 
-        |> ignore
-    host.Open()
+// let Main() =
+    // let address = "http://localhost:64385/"
+    // let host = new WebServiceHost(typeof<MyContract>, new Uri(address))
+    // host.AddServiceEndpoint(typeof<MyContract>, new WebHttpBinding(), "") 
+    //     |> ignore
+    // host.Open()
 
 
-    printfn "Server running at %s" address
-    printfn "Press a key to close server"
-    System.Console.ReadKey() |> ignore
-    host.Close()
+    // printfn "Server running at %s" address
+    // printfn "Press a key to close server"
+    // System.Console.ReadKey() |> ignore
+    // host.Close()
 
-Main()
+//Main()
+
+open Suave
+open Suave.Filters
+open Suave.Operators
+open Suave.Successful
+
+
+let app : WebPart =
+  choose
+    [ GET >=> choose
+        [ 
+          //pathScan "/%s/%s" (fun (nick,color) -> OK (initialiserPartie nick color))
+          pathScan "/%s/%s/" (fun (nick,color) -> OK (initialiserPartie nick color))
+          // pathScan "/%s/%s/%s:%s:%s:%s" (fun (nick, color, x1, y1, x2, y2) -> OK (jouerPartie PartieEnCours color x1 y1 x2 y2))
+          pathScan "/%s/%s/%s:%s:%s:%s" (fun (nick, color, x1, y1, x2, y2) -> OK (jouerPartie PartieEnCours color x1 y1 x2 y2)) ] ]
+
+startWebServer defaultConfig app
